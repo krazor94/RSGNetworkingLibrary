@@ -52,6 +52,7 @@ namespace RealSoftGames.Network
                 receivedData = new Packet();
                 receiveBuffer = new byte[dataBufferSize];
                 stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+                isConnected = true;
             }
 
             private void ReceiveCallback(IAsyncResult result)
@@ -67,6 +68,7 @@ namespace RealSoftGames.Network
 
                     byte[] data = new byte[byteLength];
                     Array.Copy(receiveBuffer, data, byteLength);
+                    Debug.Log($"Recieved Some Data {data.Length}");
                     MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
                     stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
                 }
@@ -94,11 +96,14 @@ namespace RealSoftGames.Network
 
             public void Disconnect()
             {
-                if (isConnected)
+                //if (isConnected)
                 {
+                    var client = RSGNetwork.Clients.Find(i => i.InstanceID == id);
+                    RSGNetwork.Clients.Remove(client);
+                    Debug.Log($"Client Disconnected {client.InstanceID}");
+
                     isConnected = false;
                     socket.Close();
-                    Debug.Log("Disconnected from server.");
                 }
             }
         }

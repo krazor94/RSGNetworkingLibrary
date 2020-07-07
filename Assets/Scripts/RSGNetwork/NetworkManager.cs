@@ -47,9 +47,7 @@ namespace RealSoftGames.Network
         {
             if (IsServer)
                 return;
-
-            if (Input.GetKeyDown(KeyCode.Space))
-                RSGNetwork.ServerRPC("Test", "Hello Server!!!!");
+            //TODO: Add network handling here
         }
 
         [RPC]
@@ -60,16 +58,16 @@ namespace RealSoftGames.Network
 
         protected override void OnDestroy()
         {
-            switch (networkType)
-            {
-                case NetworkType.SERVER:
-                    RSGNetwork.StopServer();
-                    break;
-
-                case NetworkType.CLIENT:
-                    RSGNetwork.DisconnectFromServer();
-                    break;
-            }
+            //switch (networkType)
+            //{
+            //    case NetworkType.SERVER:
+            //        RSGNetwork.StopServer();
+            //        break;
+            //
+            //    case NetworkType.CLIENT:
+            //        RSGNetwork.DisconnectFromServer();
+            //        break;
+            //}
 
             base.OnDestroy();
         }

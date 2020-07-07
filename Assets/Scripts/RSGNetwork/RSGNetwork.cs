@@ -109,18 +109,18 @@ namespace RealSoftGames.Network
             InstanceID = 0;
             IsServer = true;
             Debug.Log($"Server Started on port: {PortNumber}");
-            OnConnected?.Invoke();
         }
 
         private static void TCPConnectCallback(IAsyncResult result)
         {
             TcpClient client = Server.EndAcceptTcpClient(result);
             Server.BeginAcceptTcpClient(TCPConnectCallback, null);
-            Debug.Log($"Client Connecting from {client.Client.RemoteEndPoint}...");
+            Debug.Log($"Client Connecting {client.Client.RemoteEndPoint}...");
             Client newClient = new Client(client, GetNewInstanceID);
             newClient.tcp.Connect(client);
             Clients.Add(newClient);
             newClient.tcp.RPC("AssignInstanceID", newClient.InstanceID);
+            Debug.Log($"{newClient.InstanceID} Connected");
             OnClientConnected?.Invoke();
         }
 
@@ -128,7 +128,6 @@ namespace RealSoftGames.Network
         {
             IsServer = false;
             Server.Stop();
-            OnDisconnected?.Invoke();
         }
 
         #endregion Server
@@ -165,8 +164,7 @@ namespace RealSoftGames.Network
 
         public static void DisconnectFromServer()
         {
-            tcp.socket.Close();
-            OnDisconnected?.Invoke();
+            tcp.Disconnect();
         }
 
         /// <summary>
@@ -212,7 +210,6 @@ namespace RealSoftGames.Network
 
                 receiveBuffer = new byte[dataBufferSize];
                 socket.BeginConnect(RSGNetwork.IPAddress, RSGNetwork.PortNumber, ConnectCallback, socket);
-                Debug.Log("Connected to server");
             }
 
             public void Connect(string IPAddress, int PortNumber)
@@ -233,7 +230,9 @@ namespace RealSoftGames.Network
 
                 if (!socket.Connected)
                     return;
+
                 Debug.Log("Connected to server");
+                OnConnected?.Invoke();
                 stream = socket.GetStream();
                 receivedData = new Packet();
                 stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
@@ -259,7 +258,6 @@ namespace RealSoftGames.Network
             {
                 try
                 {
-                    Debug.Log("Received some data");
                     int byteLength = stream.EndRead(result);
                     if (byteLength <= 0)
                     {
@@ -268,6 +266,7 @@ namespace RealSoftGames.Network
                     }
 
                     byte[] data = new byte[byteLength];
+                    Debug.Log($"Received some data {data.Length}");
                     Array.Copy(receiveBuffer, data, byteLength);
                     MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
                     stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
@@ -278,13 +277,10 @@ namespace RealSoftGames.Network
                 }
             }
 
-            private void Disconnect()
+            public void Disconnect()
             {
-                stream = null;
-                receivedData = null;
-                receiveBuffer = null;
-                socket = null;
                 socket.Close();
+                OnDisconnected?.Invoke();
             }
         }
     }
