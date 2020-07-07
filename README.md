@@ -18,8 +18,7 @@ private void Start()
     switch (networkType)
     {
         case NetworkType.SERVER:
-            RSGNetwork.StartServer();
-            RSGNetwork.OnClientDisconnected += ChatClient.SetClientOffline;
+            RSGNetwork.StartServer();          
             break;
 
         case NetworkType.CLIENT:
