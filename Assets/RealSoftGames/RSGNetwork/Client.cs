@@ -14,13 +14,11 @@ namespace RealSoftGames.Network
     public class Client
     {
         public static int dataBufferSize = 4096;
-        public readonly int InstanceID;
         public TCP tcp;
 
-        public Client(TcpClient client, int clientID)
+        public Client(TcpClient client)
         {
-            InstanceID = clientID;
-            tcp = new TCP(InstanceID);
+            tcp = new TCP(client);
         }
 
         public void Disconnect()
@@ -30,11 +28,6 @@ namespace RealSoftGames.Network
 
         public class TCP
         {
-            public TCP(int id)
-            {
-                this.id = id;
-            }
-
             private readonly int id;
             public static int dataBufferSize = 4096;
             public TcpClient socket;
@@ -42,6 +35,12 @@ namespace RealSoftGames.Network
             private Packet receivedData;
             private byte[] receiveBuffer;
             private bool isConnected = false;
+            private TcpClient client;
+
+            public TCP(TcpClient client)
+            {
+                this.client = client;
+            }
 
             public void Connect(TcpClient tcpSocket)
             {
@@ -62,7 +61,7 @@ namespace RealSoftGames.Network
                     int byteLength = stream.EndRead(result);
                     if (byteLength <= 0)
                     {
-                        RSGNetwork.Clients.Find(i => i.InstanceID == id).Disconnect();
+                        RSGNetwork.Clients.Find(i => i.tcp.socket == result).Disconnect();
                         return;
                     }
 
@@ -84,7 +83,7 @@ namespace RealSoftGames.Network
                 {
                     if (socket != null)
                     {
-                        byte[] serializedData = new Packet(id, methodName, parameters).Serialize();
+                        byte[] serializedData = new Packet(methodName, parameters).Serialize();
                         stream.BeginWrite(serializedData, 0, serializedData.Length, null, null);
                     }
                 }
@@ -98,9 +97,9 @@ namespace RealSoftGames.Network
             {
                 //if (isConnected)
                 {
-                    var client = RSGNetwork.Clients.Find(i => i.InstanceID == id);
+                    var client = RSGNetwork.Clients.Find(i => i.tcp.socket == this.socket);
                     RSGNetwork.Clients.Remove(client);
-                    Debug.Log($"Client Disconnected {client.InstanceID}");
+                    Debug.Log($"Client Disconnected {client.tcp.socket}");
 
                     isConnected = false;
                     socket.Close();

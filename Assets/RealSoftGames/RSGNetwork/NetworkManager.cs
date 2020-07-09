@@ -50,12 +50,6 @@ namespace RealSoftGames.Network
             //TODO: Add network handling here
         }
 
-        [RPC]
-        public static void Test(string msg)
-        {
-            Debug.Log($"TestRPC: {msg}");
-        }
-
         protected override void OnDestroy()
         {
             //switch (networkType)
@@ -80,6 +74,14 @@ namespace RealSoftGames.Network
         protected override void OnConnected()
         {
             Debug.Log("OnConnected");
+            if (!IsServer)
+                RSGNetwork.ServerRPC("Ping");
+        }
+
+        [RPC]
+        public static void Ping()
+        {
+            Debug.Log("Ping Server OnConnected");
         }
     }
 }

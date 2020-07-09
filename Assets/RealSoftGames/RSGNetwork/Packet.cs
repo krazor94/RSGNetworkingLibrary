@@ -15,16 +15,14 @@ namespace RealSoftGames.Network
         {
         }
 
-        public Packet(int sender, string methodName, params object[] parameters)
+        public Packet(string methodName, params object[] parameters)
         {
-            this.sender = sender;
             this.methodName = methodName;
             this.parameters = parameters;
         }
 
         //private byte packetType;
 
-        private int sender;
         //private string callback;
 
         private string methodName;

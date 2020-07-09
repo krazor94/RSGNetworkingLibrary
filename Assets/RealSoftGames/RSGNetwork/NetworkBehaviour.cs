@@ -36,6 +36,7 @@ namespace RealSoftGames.Network
         }
 
         public static bool IsServer { get => RSGNetwork.IsServer; }
+        public static bool IsConnectedToServer { get => RSGNetwork.IsConnectedToServer; }
 
         protected virtual void OnEnable()
         {

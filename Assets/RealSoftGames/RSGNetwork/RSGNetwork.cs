@@ -19,27 +19,24 @@ namespace RealSoftGames.Network
 
         public static event Action OnDisconnected;
 
-        private static int instanceID = 1;
-
         public static string IPAddress = "127.0.0.1";
         public static int PortNumber = 8080;
         private static TcpListener Server;
         private static TCP tcp;
 
-        //private static TcpClient ClientSocket;
         public static List<Client> Clients = new List<Client>();
 
-        public static int InstanceID { get; private set; }
+        public static bool IsConnectedToServer { get; private set; }
 
-        private static int GetNewInstanceID
-        {
-            get
-            {
-                int newID = instanceID;
-                instanceID++;
-                return newID;
-            }
-        }
+        //private static int GetNewInstanceID
+        //{
+        //    get
+        //    {
+        //        int newID = instanceID;
+        //        instanceID++;
+        //        return newID;
+        //    }
+        //}
 
         public static bool IsServer { get; private set; }
 
@@ -106,7 +103,7 @@ namespace RealSoftGames.Network
             Server = new TcpListener(System.Net.IPAddress.Any, PortNumber);
             Server.Start();
             Server.BeginAcceptTcpClient(TCPConnectCallback, null);
-            InstanceID = 0;
+
             IsServer = true;
             Debug.Log($"Server Started on port: {PortNumber}");
         }
@@ -116,11 +113,11 @@ namespace RealSoftGames.Network
             TcpClient client = Server.EndAcceptTcpClient(result);
             Server.BeginAcceptTcpClient(TCPConnectCallback, null);
             Debug.Log($"Client Connecting {client.Client.RemoteEndPoint}...");
-            Client newClient = new Client(client, GetNewInstanceID);
+            Client newClient = new Client(client);
             newClient.tcp.Connect(client);
             Clients.Add(newClient);
-            newClient.tcp.RPC("AssignInstanceID", newClient.InstanceID);
-            Debug.Log($"{newClient.InstanceID} Connected");
+
+            Debug.Log($"{newClient.tcp.socket.Client.RemoteEndPoint} Connected");
             OnClientConnected?.Invoke();
         }
 
@@ -177,16 +174,9 @@ namespace RealSoftGames.Network
             tcp.Send(methodName, parameters);
         }
 
-        public static void RPC(int clientInstanceID, string methodName, params object[] parameters)
+        public static void RPC(TcpClient socket, string methodName, params object[] parameters)
         {
-            Clients.Find(i => i.InstanceID == clientInstanceID).tcp.RPC(methodName, parameters);
-        }
-
-        [RPC]
-        private static void AssignInstanceID(int id)
-        {
-            Debug.Log($"Assigning Instance ID {id}");
-            InstanceID = id;
+            Clients.Find(i => i.tcp.socket == socket).tcp.RPC(methodName, parameters);
         }
 
         #endregion Client
@@ -231,11 +221,13 @@ namespace RealSoftGames.Network
                 if (!socket.Connected)
                     return;
 
-                Debug.Log("Connected to server");
-                OnConnected?.Invoke();
                 stream = socket.GetStream();
                 receivedData = new Packet();
                 stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+
+                Debug.Log("Connected to server");
+                OnConnected?.Invoke();
+                IsConnectedToServer = true;
             }
 
             public void Send(string methodName, params object[] parameters)
@@ -244,7 +236,7 @@ namespace RealSoftGames.Network
                 {
                     if (socket != null)
                     {
-                        byte[] serializedData = new Packet(InstanceID, methodName, parameters).Serialize();
+                        byte[] serializedData = new Packet(methodName, parameters).Serialize();
                         stream.BeginWrite(serializedData, 0, serializedData.Length, null, null); // send to server
                     }
                 }
@@ -281,6 +273,7 @@ namespace RealSoftGames.Network
             {
                 socket.Close();
                 OnDisconnected?.Invoke();
+                IsConnectedToServer = false;
             }
         }
     }
