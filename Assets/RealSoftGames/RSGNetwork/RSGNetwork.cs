@@ -8,16 +8,19 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace RealSoftGames.Network
 {
     public static class RSGNetwork
     {
+        #region Run on client machine
+
         public static event Action OnConnected;
 
-        public static event Action OnClientConnected;
-
         public static event Action OnDisconnected;
+
+        #endregion Run on client machine
 
         public static string IPAddress = "127.0.0.1";
         public static int PortNumber = 8080;
@@ -27,16 +30,6 @@ namespace RealSoftGames.Network
         public static List<Client> Clients = new List<Client>();
 
         public static bool IsConnectedToServer { get; private set; }
-
-        //private static int GetNewInstanceID
-        //{
-        //    get
-        //    {
-        //        int newID = instanceID;
-        //        instanceID++;
-        //        return newID;
-        //    }
-        //}
 
         public static bool IsServer { get; private set; }
 
@@ -95,10 +88,24 @@ namespace RealSoftGames.Network
 
         #region Server
 
+        private static void ClientConnected(Client client)
+        {
+            Debug.LogError($"{client.tcp.socket.Client.RemoteEndPoint} Connected");
+            Clients.Add(client);
+        }
+
+        private static void ClientDisconnected(Client client)
+        {
+            Debug.LogError($"{client.tcp.socket.Client.RemoteEndPoint} Disconnected");
+            Clients.Remove(client);
+        }
+
         public static void StartServer()
         {
             Debug.Log("Starting server...");
             GetRPCs();
+            Client.OnClientConnected += ClientConnected;
+            Client.OnClientDisconnected += ClientDisconnected;
 
             Server = new TcpListener(System.Net.IPAddress.Any, PortNumber);
             Server.Start();
@@ -112,19 +119,19 @@ namespace RealSoftGames.Network
         {
             TcpClient client = Server.EndAcceptTcpClient(result);
             Server.BeginAcceptTcpClient(TCPConnectCallback, null);
+
             Debug.Log($"Client Connecting {client.Client.RemoteEndPoint}...");
             Client newClient = new Client(client);
             newClient.tcp.Connect(client);
-            Clients.Add(newClient);
-
-            Debug.Log($"{newClient.tcp.socket.Client.RemoteEndPoint} Connected");
-            OnClientConnected?.Invoke();
         }
 
         public static void StopServer()
         {
             IsServer = false;
             Server.Stop();
+
+            Client.OnClientDisconnected -= ClientDisconnected;
+            Client.OnClientConnected -= ClientConnected;
         }
 
         #endregion Server
@@ -185,7 +192,6 @@ namespace RealSoftGames.Network
         {
             public static int dataBufferSize = 4096;
             public TcpClient socket;
-            private int id = 0;
             private NetworkStream stream;
             private Packet receivedData;
             private byte[] receiveBuffer;
@@ -199,7 +205,7 @@ namespace RealSoftGames.Network
                 };
 
                 receiveBuffer = new byte[dataBufferSize];
-                socket.BeginConnect(RSGNetwork.IPAddress, RSGNetwork.PortNumber, ConnectCallback, socket);
+                socket.BeginConnect(IPAddress, PortNumber, ConnectCallback, socket);
             }
 
             public void Connect(string IPAddress, int PortNumber)
@@ -240,9 +246,9 @@ namespace RealSoftGames.Network
                         stream.BeginWrite(serializedData, 0, serializedData.Length, null, null); // send to server
                     }
                 }
-                catch (Exception _ex)
+                catch (Exception ex)
                 {
-                    Debug.Log($"Error sending data to server via TCP: {_ex}");
+                    Debug.Log($"Error sending data to server via TCP: {ex}");
                 }
             }
 

@@ -43,27 +43,18 @@ namespace RealSoftGames.Network
             }
         }
 
-        private void Update()
+        private void OnApplicationQuit()
         {
-            if (IsServer)
-                return;
-            //TODO: Add network handling here
-        }
+            switch (networkType)
+            {
+                case NetworkType.SERVER:
+                    RSGNetwork.StopServer();
+                    break;
 
-        protected override void OnDestroy()
-        {
-            //switch (networkType)
-            //{
-            //    case NetworkType.SERVER:
-            //        RSGNetwork.StopServer();
-            //        break;
-            //
-            //    case NetworkType.CLIENT:
-            //        RSGNetwork.DisconnectFromServer();
-            //        break;
-            //}
-
-            base.OnDestroy();
+                case NetworkType.CLIENT:
+                    RSGNetwork.DisconnectFromServer();
+                    break;
+            }
         }
 
         protected override void OnDisconnected()
@@ -75,13 +66,13 @@ namespace RealSoftGames.Network
         {
             Debug.Log("OnConnected");
             if (!IsServer)
-                RSGNetwork.ServerRPC("Ping");
+                RSGNetwork.ServerRPC("Test");
         }
 
         [RPC]
-        public static void Ping()
+        private static void Test()
         {
-            Debug.Log("Ping Server OnConnected");
+            Debug.LogError("OnConnected From Client");
         }
     }
 }

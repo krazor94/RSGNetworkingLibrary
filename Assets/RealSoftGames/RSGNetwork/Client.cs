@@ -13,12 +13,16 @@ namespace RealSoftGames.Network
     [System.Serializable]
     public class Client
     {
+        public static event Action<Client> OnClientConnected;
+
+        public static event Action<Client> OnClientDisconnected;
+
         public static int dataBufferSize = 4096;
         public TCP tcp;
 
         public Client(TcpClient client)
         {
-            tcp = new TCP(client);
+            tcp = new TCP(client, this);
         }
 
         public void Disconnect()
@@ -35,10 +39,11 @@ namespace RealSoftGames.Network
             private Packet receivedData;
             private byte[] receiveBuffer;
             private bool isConnected = false;
-            private TcpClient client;
+            public readonly Client client;
 
-            public TCP(TcpClient client)
+            public TCP(TcpClient socket, Client client)
             {
+                this.socket = socket;
                 this.client = client;
             }
 
@@ -52,6 +57,8 @@ namespace RealSoftGames.Network
                 receiveBuffer = new byte[dataBufferSize];
                 stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
                 isConnected = true;
+
+                OnClientConnected?.Invoke(client);
             }
 
             private void ReceiveCallback(IAsyncResult result)
@@ -61,7 +68,7 @@ namespace RealSoftGames.Network
                     int byteLength = stream.EndRead(result);
                     if (byteLength <= 0)
                     {
-                        RSGNetwork.Clients.Find(i => i.tcp.socket == result).Disconnect();
+                        client.Disconnect();
                         return;
                     }
 
@@ -96,14 +103,12 @@ namespace RealSoftGames.Network
             public void Disconnect()
             {
                 //if (isConnected)
-                {
-                    var client = RSGNetwork.Clients.Find(i => i.tcp.socket == this.socket);
-                    RSGNetwork.Clients.Remove(client);
-                    Debug.Log($"Client Disconnected {client.tcp.socket}");
-
-                    isConnected = false;
-                    socket.Close();
-                }
+                //{
+                Debug.Log($"Client Disconnected {socket.Client.RemoteEndPoint}");
+                OnClientDisconnected?.Invoke(client);
+                isConnected = false;
+                socket.Close();
+                //}
             }
         }
     }

@@ -6,6 +6,7 @@
 using System;
 using UnityEngine;
 using NetworkView = RealSoftGames.Network.NetworkView;
+using RPC = RealSoftGames.Network.RPC;
 
 namespace RealSoftGames.Network
 {
