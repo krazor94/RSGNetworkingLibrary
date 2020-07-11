@@ -3,12 +3,11 @@
 //Company: RealSoft Games
 //Website: https://www.realsoftgames.com/
 
-using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 
 namespace RealSoftGames.Network
 {
@@ -24,15 +23,14 @@ namespace RealSoftGames.Network
 
         public static string IPAddress = "127.0.0.1";
         public static int PortNumber = 8080;
-        private static TcpListener Server;
+        private static Socket Server;
         private static TCP tcp;
+        private static string guid;
 
         public static List<Client> Clients = new List<Client>();
 
         public static bool IsConnectedToServer { get; private set; }
-
         public static bool IsServer { get; private set; }
-
         public static bool IsInitialized { get; private set; }
 
         public static Type[] GetAssemblies()
@@ -88,15 +86,20 @@ namespace RealSoftGames.Network
 
         #region Server
 
+        private static string GetGUID()
+        {
+            return Guid.NewGuid().ToString().Replace("-", "").ToUpper();
+        }
+
         private static void ClientConnected(Client client)
         {
-            Debug.LogError($"{client.tcp.socket.Client.RemoteEndPoint} Connected");
+            Debug.LogError($"{client.tcp.socket.RemoteEndPoint} Connected");
             Clients.Add(client);
         }
 
         private static void ClientDisconnected(Client client)
         {
-            Debug.LogError($"{client.tcp.socket.Client.RemoteEndPoint} Disconnected");
+            Debug.LogError($"{client.tcp.socket.RemoteEndPoint} Disconnected");
             Clients.Remove(client);
         }
 
@@ -107,28 +110,42 @@ namespace RealSoftGames.Network
             Client.OnClientConnected += ClientConnected;
             Client.OnClientDisconnected += ClientDisconnected;
 
-            Server = new TcpListener(System.Net.IPAddress.Any, PortNumber);
-            Server.Start();
-            Server.BeginAcceptTcpClient(TCPConnectCallback, null);
+            Server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);// System.Net.IPAddress.Any, PortNumber);
+            Server.Bind(new IPEndPoint(System.Net.IPAddress.Any, PortNumber));
+            Server.Listen(0);
+            Server.BeginAccept(TCPConnectCallback, null);
 
+            //Server.Start();
+            //Server.BeginAcceptTcpClient(TCPConnectCallback, null);
+            //Server.Server.BeginAccept(Server.Server.ReceiveBufferSize, TCPConnectCallback, null);
             IsServer = true;
             Debug.Log($"Server Started on port: {PortNumber}");
         }
 
         private static void TCPConnectCallback(IAsyncResult result)
         {
-            TcpClient client = Server.EndAcceptTcpClient(result);
-            Server.BeginAcceptTcpClient(TCPConnectCallback, null);
+            string clientsGUID = GetGUID();
+            //TcpClient client = Server.EndAcceptTcpClient(result);
+            //Server.BeginAcceptTcpClient(TCPConnectCallback, null);
+            Socket socket = Server.EndAccept(result);
 
-            Debug.Log($"Client Connecting {client.Client.RemoteEndPoint}...");
-            Client newClient = new Client(client);
-            newClient.tcp.Connect(client);
+            byte[] buff = clientsGUID.Serialize();
+            socket.Send(buff, 0, buff.Length, SocketFlags.None);
+            //socket.BeginSend(clientsGUID.Serialize(), 0, 32, SocketFlags.None, null, null);
+
+            Server.BeginAccept(TCPConnectCallback, null);
+
+            Debug.Log($"Client Connecting {socket.RemoteEndPoint}...");
+            Client newClient = new Client(socket, clientsGUID);
+            newClient.tcp.Connect(socket);
         }
 
         public static void StopServer()
         {
             IsServer = false;
-            Server.Stop();
+            //Server.Stop();
+            Server.Disconnect(false);
+            Server.Close();
 
             Client.OnClientDisconnected -= ClientDisconnected;
             Client.OnClientConnected -= ClientConnected;
@@ -181,7 +198,7 @@ namespace RealSoftGames.Network
             tcp.Send(methodName, parameters);
         }
 
-        public static void RPC(TcpClient socket, string methodName, params object[] parameters)
+        public static void RPC(Socket socket, string methodName, params object[] parameters)
         {
             Clients.Find(i => i.tcp.socket == socket).tcp.RPC(methodName, parameters);
         }
@@ -191,18 +208,15 @@ namespace RealSoftGames.Network
         public class TCP
         {
             public static int dataBufferSize = 4096;
-            public TcpClient socket;
-            private NetworkStream stream;
+            public Socket socket;
             private Packet receivedData;
             private byte[] receiveBuffer;
 
             public void Connect()
             {
-                socket = new TcpClient
-                {
-                    ReceiveBufferSize = dataBufferSize,
-                    SendBufferSize = dataBufferSize
-                };
+                socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                socket.ReceiveBufferSize = dataBufferSize;
+                socket.SendBufferSize = dataBufferSize;
 
                 receiveBuffer = new byte[dataBufferSize];
                 socket.BeginConnect(IPAddress, PortNumber, ConnectCallback, socket);
@@ -210,11 +224,9 @@ namespace RealSoftGames.Network
 
             public void Connect(string IPAddress, int PortNumber)
             {
-                socket = new TcpClient
-                {
-                    ReceiveBufferSize = dataBufferSize,
-                    SendBufferSize = dataBufferSize
-                };
+                socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                socket.ReceiveBufferSize = dataBufferSize;
+                socket.SendBufferSize = dataBufferSize;
 
                 receiveBuffer = new byte[dataBufferSize];
                 socket.BeginConnect(IPAddress, PortNumber, ConnectCallback, socket);
@@ -227,13 +239,40 @@ namespace RealSoftGames.Network
                 if (!socket.Connected)
                     return;
 
-                stream = socket.GetStream();
+                byte[] buff = new byte[socket.Available];
+                int rec = socket.Receive(buff, 0, socket.Available, SocketFlags.None);
+                guid = buff.Deserialize<string>();
+                Debug.Log($"Received:{buff.Length} bytes: {guid}");
+
                 receivedData = new Packet();
-                stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+                socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
 
                 Debug.Log("Connected to server");
                 OnConnected?.Invoke();
                 IsConnectedToServer = true;
+            }
+
+            private void ReceiveCallback(IAsyncResult result)
+            {
+                try
+                {
+                    int byteLength = socket.EndReceive(result);
+                    if (byteLength <= 0)
+                    {
+                        Disconnect();
+                        return;
+                    }
+
+                    byte[] data = new byte[byteLength];
+                    Debug.Log($"Received some data {data.Length}");
+                    MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
+                    Array.Copy(receiveBuffer, data, byteLength);
+                    socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
+                }
+                catch
+                {
+                    Disconnect();
+                }
             }
 
             public void Send(string methodName, params object[] parameters)
@@ -243,35 +282,12 @@ namespace RealSoftGames.Network
                     if (socket != null)
                     {
                         byte[] serializedData = new Packet(methodName, parameters).Serialize();
-                        stream.BeginWrite(serializedData, 0, serializedData.Length, null, null); // send to server
+                        socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }
                 }
                 catch (Exception ex)
                 {
                     Debug.Log($"Error sending data to server via TCP: {ex}");
-                }
-            }
-
-            private void ReceiveCallback(IAsyncResult result)
-            {
-                try
-                {
-                    int byteLength = stream.EndRead(result);
-                    if (byteLength <= 0)
-                    {
-                        Disconnect();
-                        return;
-                    }
-
-                    byte[] data = new byte[byteLength];
-                    Debug.Log($"Received some data {data.Length}");
-                    Array.Copy(receiveBuffer, data, byteLength);
-                    MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
-                    stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
-                }
-                catch
-                {
-                    Disconnect();
                 }
             }
 

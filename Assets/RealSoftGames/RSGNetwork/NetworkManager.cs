@@ -56,23 +56,5 @@ namespace RealSoftGames.Network
                     break;
             }
         }
-
-        protected override void OnDisconnected()
-        {
-            Debug.Log("OnDisconnected");
-        }
-
-        protected override void OnConnected()
-        {
-            Debug.Log("OnConnected");
-            if (!IsServer)
-                RSGNetwork.ServerRPC("Test");
-        }
-
-        [RPC]
-        private static void Test()
-        {
-            Debug.LogError("OnConnected From Client");
-        }
     }
 }

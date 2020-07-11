@@ -13,17 +13,19 @@ namespace RealSoftGames.Network
     [System.Serializable]
     public class Client
     {
+        public Client(Socket client, string guid)
+        {
+            tcp = new TCP(client, this);
+            GUID = guid;
+        }
+
         public static event Action<Client> OnClientConnected;
 
         public static event Action<Client> OnClientDisconnected;
 
         public static int dataBufferSize = 4096;
         public TCP tcp;
-
-        public Client(TcpClient client)
-        {
-            tcp = new TCP(client, this);
-        }
+        public readonly string GUID;
 
         public void Disconnect()
         {
@@ -32,30 +34,32 @@ namespace RealSoftGames.Network
 
         public class TCP
         {
-            private readonly int id;
-            public static int dataBufferSize = 4096;
-            public TcpClient socket;
-            private NetworkStream stream;
-            private Packet receivedData;
-            private byte[] receiveBuffer;
-            private bool isConnected = false;
-            public readonly Client client;
-
-            public TCP(TcpClient socket, Client client)
+            public TCP(Socket socket, Client client)
             {
                 this.socket = socket;
                 this.client = client;
             }
 
-            public void Connect(TcpClient tcpSocket)
+            public static int dataBufferSize = 4096;
+            public Socket socket;
+
+            //private NetworkStream stream;
+            private Packet receivedData;
+
+            private byte[] receiveBuffer;
+            private bool isConnected = false;
+            public readonly Client client;
+
+            public void Connect(Socket tcpSocket)
             {
                 socket = tcpSocket;
                 socket.ReceiveBufferSize = dataBufferSize;
                 socket.SendBufferSize = dataBufferSize;
-                stream = socket.GetStream();
+                //stream = socket.GetStream();
+
                 receivedData = new Packet();
                 receiveBuffer = new byte[dataBufferSize];
-                stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+                socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
                 isConnected = true;
 
                 OnClientConnected?.Invoke(client);
@@ -65,7 +69,8 @@ namespace RealSoftGames.Network
             {
                 try
                 {
-                    int byteLength = stream.EndRead(result);
+                    //int byteLength = stream.EndRead(result);
+                    int byteLength = socket.EndReceive(result);
                     if (byteLength <= 0)
                     {
                         client.Disconnect();
@@ -74,9 +79,10 @@ namespace RealSoftGames.Network
 
                     byte[] data = new byte[byteLength];
                     Array.Copy(receiveBuffer, data, byteLength);
-                    Debug.Log($"Recieved Some Data {data.Length}");
+                    //Debug.Log($"Recieved Some Data {data.Length}");
                     MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
-                    stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+                    //stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+                    socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
                 }
                 catch (Exception e)
                 {
@@ -91,7 +97,8 @@ namespace RealSoftGames.Network
                     if (socket != null)
                     {
                         byte[] serializedData = new Packet(methodName, parameters).Serialize();
-                        stream.BeginWrite(serializedData, 0, serializedData.Length, null, null);
+                        //stream.BeginWrite(serializedData, 0, serializedData.Length, null, null);
+                        socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }
                 }
                 catch (Exception e)
@@ -104,7 +111,7 @@ namespace RealSoftGames.Network
             {
                 //if (isConnected)
                 //{
-                Debug.Log($"Client Disconnected {socket.Client.RemoteEndPoint}");
+                Debug.Log($"Client Disconnected {socket.RemoteEndPoint}");
                 OnClientDisconnected?.Invoke(client);
                 isConnected = false;
                 socket.Close();
