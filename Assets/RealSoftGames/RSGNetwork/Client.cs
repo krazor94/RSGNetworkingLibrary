@@ -42,10 +42,8 @@ namespace RealSoftGames.Network
 
             public static int dataBufferSize = 4096;
             public Socket socket;
-
-            //private NetworkStream stream;
+            private string guid;
             private Packet receivedData;
-
             private byte[] receiveBuffer;
             private bool isConnected = false;
             public readonly Client client;
@@ -90,13 +88,14 @@ namespace RealSoftGames.Network
                 }
             }
 
-            public void RPC(string methodName, params object[] parameters)
+            public void RPC(string methodName, string callback = null, params object[] parameters)
             {
                 try
                 {
                     if (socket != null)
                     {
-                        byte[] serializedData = new Packet(methodName, parameters).Serialize();
+                        //Send back to client and send servers GUID as well
+                        byte[] serializedData = new Packet(methodName, callback, parameters).Serialize();
                         //stream.BeginWrite(serializedData, 0, serializedData.Length, null, null);
                         socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }

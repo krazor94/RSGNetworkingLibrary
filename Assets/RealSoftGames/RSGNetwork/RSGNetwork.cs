@@ -27,8 +27,9 @@ namespace RealSoftGames.Network
         private static TCP tcp;
         private static string guid;
 
-        public static List<Client> Clients = new List<Client>();
+        public static Dictionary<string, Client> Clients = new Dictionary<string, Client>();
 
+        public static string GUID { get => guid; }
         public static bool IsConnectedToServer { get; private set; }
         public static bool IsServer { get; private set; }
         public static bool IsInitialized { get; private set; }
@@ -93,14 +94,14 @@ namespace RealSoftGames.Network
 
         private static void ClientConnected(Client client)
         {
-            Debug.LogError($"{client.tcp.socket.RemoteEndPoint} Connected");
-            Clients.Add(client);
+            Debug.LogError($"{client.GUID} - {client.tcp.socket.RemoteEndPoint} Connected");
+            Clients.Add(client.GUID, client);
         }
 
         private static void ClientDisconnected(Client client)
         {
-            Debug.LogError($"{client.tcp.socket.RemoteEndPoint} Disconnected");
-            Clients.Remove(client);
+            Debug.LogError($"{client.GUID} - {client.tcp.socket.RemoteEndPoint} Disconnected");
+            Clients.Remove(client.GUID);
         }
 
         public static void StartServer()
@@ -186,6 +187,7 @@ namespace RealSoftGames.Network
         public static void DisconnectFromServer()
         {
             tcp.Disconnect();
+            tcp.socket.Close();
         }
 
         /// <summary>
@@ -195,12 +197,27 @@ namespace RealSoftGames.Network
         /// <param name="parameters"></param>
         public static void ServerRPC(string methodName, params object[] parameters)
         {
-            tcp.Send(methodName, parameters);
+            tcp.Send(methodName, null, parameters);
         }
 
-        public static void RPC(Socket socket, string methodName, params object[] parameters)
+        public static void ServerRPC(string methodName, string callback = null, params object[] parameters)
         {
-            Clients.Find(i => i.tcp.socket == socket).tcp.RPC(methodName, parameters);
+            tcp.Send(methodName, callback, parameters);
+        }
+
+        /// <summary>
+        /// Send RPC to Client
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="methodName"></param>
+        /// <param name="callback"></param>
+        /// <param name="parameters"></param>
+        public static void RPC(string guid, string methodName, string callback = null, params object[] parameters)
+        {
+            if (Clients.TryGetValue(guid, out var value))
+                value.tcp.RPC(methodName, callback, parameters);
+            else
+                Debug.LogError($"Client:{guid} is not connected");
         }
 
         #endregion Client
@@ -239,17 +256,36 @@ namespace RealSoftGames.Network
                 if (!socket.Connected)
                     return;
 
-                byte[] buff = new byte[socket.Available];
-                int rec = socket.Receive(buff, 0, socket.Available, SocketFlags.None);
-                guid = buff.Deserialize<string>();
-                Debug.Log($"Received:{buff.Length} bytes: {guid}");
-
                 receivedData = new Packet();
-                socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
+                socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, InitReceiveCallback, null);
 
-                Debug.Log("Connected to server");
-                OnConnected?.Invoke();
-                IsConnectedToServer = true;
+                //socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
+            }
+
+            private void InitReceiveCallback(IAsyncResult result)
+            {
+                try
+                {
+                    int byteLength = socket.EndReceive(result);
+                    if (byteLength <= 0)
+                    {
+                        Disconnect();
+                        return;
+                    }
+                    guid = receiveBuffer.Deserialize<string>();
+                    //Debug.Log($"Received:{receiveBuffer.Length} bytes: {guid}");
+                    //byte[] data = new byte[receiveBuffer.Length];
+                    //Array.Copy(receiveBuffer, data, receiveBuffer.Length);
+                    socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
+
+                    Debug.Log("Connected to server");
+                    IsConnectedToServer = true;
+                    OnConnected?.Invoke();
+                }
+                catch
+                {
+                    Disconnect();
+                }
             }
 
             private void ReceiveCallback(IAsyncResult result)
@@ -264,9 +300,15 @@ namespace RealSoftGames.Network
                     }
 
                     byte[] data = new byte[byteLength];
-                    Debug.Log($"Received some data {data.Length}");
-                    MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
+                    //Debug.Log($"Received some data {byteLength}");
                     Array.Copy(receiveBuffer, data, byteLength);
+
+                    receivedData = data.Deserialize<Packet>();
+                    if (!string.IsNullOrEmpty(receivedData.MethodName))
+                        MainThreadDispatcher.AddMessage(receivedData);
+                    else
+                        Debug.LogError($"Cant have a null method name in packet!");
+
                     socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
                 }
                 catch
@@ -275,13 +317,13 @@ namespace RealSoftGames.Network
                 }
             }
 
-            public void Send(string methodName, params object[] parameters)
+            public void Send(string methodName, string callback, params object[] parameters)
             {
                 try
                 {
                     if (socket != null)
                     {
-                        byte[] serializedData = new Packet(methodName, parameters).Serialize();
+                        byte[] serializedData = new Packet(guid, methodName, callback, parameters).Serialize();
                         socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }
                 }
