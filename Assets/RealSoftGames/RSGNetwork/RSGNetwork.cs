@@ -254,7 +254,10 @@ namespace RealSoftGames.Network
                 socket.EndConnect(result);
 
                 if (!socket.Connected)
+                {
+                    Debug.LogError("Socket is not connected");
                     return;
+                }
 
                 receivedData = new Packet();
                 socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, InitReceiveCallback, null);
@@ -269,6 +272,7 @@ namespace RealSoftGames.Network
                     int byteLength = socket.EndReceive(result);
                     if (byteLength <= 0)
                     {
+                        Debug.LogError($"byteLength {byteLength}");
                         Disconnect();
                         return;
                     }
@@ -282,8 +286,9 @@ namespace RealSoftGames.Network
                     IsConnectedToServer = true;
                     OnConnected?.Invoke();
                 }
-                catch
+                catch (Exception e)
                 {
+                    Debug.LogError($"InitReceiveCallback Failed: {e.Message}");
                     Disconnect();
                 }
             }
@@ -311,8 +316,9 @@ namespace RealSoftGames.Network
 
                     socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
                 }
-                catch
+                catch (Exception e)
                 {
+                    Debug.LogError($"ReceiveCallback Failed: {e.Message}");
                     Disconnect();
                 }
             }
@@ -326,16 +332,18 @@ namespace RealSoftGames.Network
                         byte[] serializedData = new Packet(guid, methodName, callback, parameters).Serialize();
                         socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }
+                    else
+                        Debug.LogError("Socket is null");
                 }
-                catch (Exception ex)
+                catch (Exception e)
                 {
-                    Debug.Log($"Error sending data to server via TCP: {ex}");
+                    Debug.Log($"Error sending data to server via TCP: {e.Message}");
                 }
             }
 
             public void Disconnect()
             {
-                socket.Close();
+                socket.Disconnect(false);
                 OnDisconnected?.Invoke();
                 IsConnectedToServer = false;
             }

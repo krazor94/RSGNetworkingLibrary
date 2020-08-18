@@ -5,7 +5,6 @@
 
 using System;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using UnityEditor;
 
 namespace RealSoftGames.Network
@@ -113,7 +112,7 @@ namespace RealSoftGames.Network
                 Debug.Log($"Client Disconnected {socket.RemoteEndPoint}");
                 OnClientDisconnected?.Invoke(client);
                 isConnected = false;
-                socket.Close();
+                socket.Disconnect(false);
                 //}
             }
         }

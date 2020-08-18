@@ -3,9 +3,6 @@
 //Company: RealSoft Games
 //Website: https://www.realsoftgames.com/
 
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 
 namespace RealSoftGames.Network
@@ -65,19 +62,6 @@ namespace RealSoftGames.Network
                     RSGNetwork.ConnectToServer();
                     break;
             }
-        }
-
-        [RPC]
-        private static float TestRPC(float a, float b)
-        {
-            Debug.Log($"{a + b} = {a} + {b}");
-            return a + b;
-        }
-
-        [RPC]
-        private static void ResultRPC(float result)
-        {
-            Debug.Log($"Result = {result}");
         }
 
         private void OnApplicationQuit()
