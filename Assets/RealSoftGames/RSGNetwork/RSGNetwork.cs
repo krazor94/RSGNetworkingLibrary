@@ -205,6 +205,11 @@ namespace RealSoftGames.Network
             tcp.Send(methodName, callback, parameters);
         }
 
+        public static void ServerRPCCallback(string methodName, string callback, params object[] parameters)
+        {
+            tcp.Send(methodName, callback, parameters);
+        }
+
         /// <summary>
         /// Send RPC to Client
         /// </summary>
@@ -272,7 +277,6 @@ namespace RealSoftGames.Network
                     int byteLength = socket.EndReceive(result);
                     if (byteLength <= 0)
                     {
-                        Debug.LogError($"byteLength {byteLength}");
                         Disconnect();
                         return;
                     }
@@ -332,8 +336,6 @@ namespace RealSoftGames.Network
                         byte[] serializedData = new Packet(guid, methodName, callback, parameters).Serialize();
                         socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }
-                    else
-                        Debug.LogError("Socket is null");
                 }
                 catch (Exception e)
                 {
