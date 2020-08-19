@@ -18,8 +18,11 @@ namespace RealSoftGames
         {
             if (packets.Count > 0)
             {
-                foreach (var packet in packets)
-                    Invoker(packet);
+                lock (packets)
+                {
+                    foreach (var packet in packets)
+                        Invoker(packet);
+                }
 
                 packets.Clear();
             }
@@ -40,7 +43,10 @@ namespace RealSoftGames
         public static void AddMessage(Packet packet)
         {
             if (packet != null)
-                packets.Add(packet);
+            {
+                lock (packets)
+                    packets.Add(packet);
+            }
             else
                 Debug.LogError("Cant add a null message!");
         }
