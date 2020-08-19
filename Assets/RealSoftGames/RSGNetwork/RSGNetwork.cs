@@ -145,7 +145,6 @@ namespace RealSoftGames.Network
         {
             IsServer = false;
             //Server.Stop();
-            Server.Disconnect(false);
             Server.Close();
 
             Client.OnClientDisconnected -= ClientDisconnected;
