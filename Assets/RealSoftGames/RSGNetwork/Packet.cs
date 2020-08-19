@@ -67,7 +67,7 @@ namespace RealSoftGames.Network
                         }
                         else
                         {
-                            RSGNetwork.ServerRPC(callback, null, result == null ? null : result);
+                            RSGNetwork.ServerRPC(callback, result == null ? null : result);
                         }
                     }
                 }
@@ -94,7 +94,7 @@ namespace RealSoftGames.Network
                                     else
                                     {
                                         if (result != null)
-                                            RSGNetwork.ServerRPC(callback, null, result);
+                                            RSGNetwork.ServerRPC(callback, result);
                                         else
                                             RSGNetwork.ServerRPC(callback);
                                     }
