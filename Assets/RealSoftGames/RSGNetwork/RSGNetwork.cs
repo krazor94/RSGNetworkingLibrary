@@ -200,11 +200,6 @@ namespace RealSoftGames.Network
             tcp.Send(methodName, null, parameters);
         }
 
-        public static void ServerRPC(string methodName, string callback = null, params object[] parameters)
-        {
-            tcp.Send(methodName, callback, parameters);
-        }
-
         public static void ServerRPCCallback(string methodName, string callback, params object[] parameters)
         {
             tcp.Send(methodName, callback, parameters);
