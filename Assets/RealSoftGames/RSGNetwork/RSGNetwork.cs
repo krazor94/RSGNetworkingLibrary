@@ -132,14 +132,45 @@ namespace RealSoftGames.Network
             Socket socket = Server.EndAccept(result);
 
             byte[] buff = clientsGUID.Serialize();
-            socket.Send(buff, 0, buff.Length, SocketFlags.None);
+            SocketError socketError;
+            //socket.Send(buff, 0, buff.Length, SocketFlags.None, out socketError);
+            SendState state = new SendState();
+            state.dataToSend = new byte[buff.Length + 4];
+            state.socket = socket;
+            byte[] prefix = BitConverter.GetBytes(buff.Length);
+            Buffer.BlockCopy(prefix, 0, state.dataToSend, 0, prefix.Length);
+            Buffer.BlockCopy(buff, 0, state.dataToSend, prefix.Length, buff.Length);
+            Debug.Log($"Sending GUID to Client {clientsGUID} - Size:{state.dataToSend.Length}");
+            socket.BeginSend(state.dataToSend, 0, state.dataToSend.Length, SocketFlags.None, out socketError, new AsyncCallback(TCPConnectSendCallback), state);
+            //socket.Send(state.dataToSend, 0, state.dataToSend.Length, SocketFlags.None, out socketError);
+            if (socketError != SocketError.Success)
+                Debug.LogError($"TCPConnectCallback SocketError: {socketError}");
             //socket.BeginSend(clientsGUID.Serialize(), 0, 32, SocketFlags.None, null, null);
 
             Server.BeginAccept(new AsyncCallback(TCPConnectCallback), null);
 
-            Debug.Log($"Client Connecting {socket.RemoteEndPoint}...");
+            Debug.Log($" {socket.RemoteEndPoint} Client Connecting...");
             Client newClient = new Client(socket, clientsGUID);
             newClient.tcp.Connect(socket);
+        }
+
+        private static void TCPConnectSendCallback(IAsyncResult result)
+        {
+            SendState state = (SendState)result.AsyncState;
+            SocketError socketError;
+            int sentData = state.socket.EndSend(result, out socketError);
+
+            if (socketError != SocketError.Success)
+            {
+                Debug.LogError($"SocketError: {socketError}");
+                state.socket.Close();
+                return;
+            }
+
+            state.dataSent += sentData;
+            Debug.Log($"DataSent:{state.dataSent}, DataToSend:{state.dataToSend.Length}");
+            if (state.dataSent != state.dataToSend.Length)
+                state.socket.BeginSend(state.dataToSend, state.dataSent, state.dataToSend.Length - state.dataSent, SocketFlags.None, new AsyncCallback(TCPConnectSendCallback), state);
         }
 
         public static void StopServer()
@@ -226,27 +257,29 @@ namespace RealSoftGames.Network
         {
             public static int dataBufferSize = 4096;
             public Socket socket;
-            private Packet receivedData;
-            private byte[] receiveBuffer;
+            //private Packet receivedData;
+            //private byte[] receiveBuffer;
 
             public void Connect()
             {
+                Debug.Log("Connecting to server...");
                 socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
                 socket.ReceiveBufferSize = dataBufferSize;
                 socket.SendBufferSize = dataBufferSize;
 
-                receiveBuffer = new byte[dataBufferSize];
-                socket.BeginConnect(IPAddress, PortNumber, ConnectCallback, socket);
+                //receiveBuffer = new byte[dataBufferSize];
+                socket.BeginConnect(IPAddress, PortNumber, new AsyncCallback(ConnectCallback), socket);
             }
 
             public void Connect(string IPAddress, int PortNumber)
             {
+                Debug.Log("Connecting to server...");
                 socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
                 socket.ReceiveBufferSize = dataBufferSize;
                 socket.SendBufferSize = dataBufferSize;
 
-                receiveBuffer = new byte[dataBufferSize];
-                socket.BeginConnect(IPAddress, PortNumber, ConnectCallback, socket);
+                //receiveBuffer = new byte[dataBufferSize];
+                socket.BeginConnect(IPAddress, PortNumber, new AsyncCallback(ConnectCallback), socket);
             }
 
             private void ConnectCallback(IAsyncResult result)
@@ -260,8 +293,8 @@ namespace RealSoftGames.Network
                 }
 
                 ReceiveState state = new ReceiveState();
-                receivedData = new Packet();
-                socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, InitReceiveCallback, state);
+                //receivedData = new Packet();
+                socket.BeginReceive(state.Buffer, 0, dataBufferSize, SocketFlags.None, new AsyncCallback(InitReceiveCallback), state);
 
                 //socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, null);
             }
@@ -270,6 +303,7 @@ namespace RealSoftGames.Network
             {
                 try
                 {
+                    Debug.Log("InitReceiveCallback Client");
                     ReceiveState state = (ReceiveState)result.AsyncState;
                     SocketError socketError;
 
@@ -285,15 +319,19 @@ namespace RealSoftGames.Network
 
                     if (byteLength <= 0)
                     {
+                        Debug.LogError("byteLength <= 0");
                         Disconnect();
                         return;
                     }
 
-                    if (state.DataSizeReceived)
+                    if (!state.DataSizeReceived)
                     {
                         if (byteLength >= 4)
                         {
                             state.DataSize = BitConverter.ToInt32(state.Buffer, 0);
+
+                            Debug.Log($"(byteLength >= 4) - DataSize:{state.DataSize}");
+
                             state.DataSizeReceived = true;
                             byteLength -= 4;
                             dataOffset += 4;
@@ -302,19 +340,19 @@ namespace RealSoftGames.Network
 
                     if ((state.Data.Length + byteLength) == state.DataSize)
                     {
+                        Debug.Log("Received full packet");
                         state.Data.Write(state.Buffer, dataOffset, byteLength);
-                        using (BinaryReader reader = new BinaryReader(state.Data))
-                        {
-                            byte[] data = reader.ReadBytes(state.DataSize);
-                            guid = data.Deserialize<string>();
-                            socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, new ReceiveState());
-                            Debug.Log("Connected to server");
-                            IsConnectedToServer = true;
-                            OnConnected?.Invoke();
-                        }
+
+                        guid = state.Data.ToArray().Deserialize<string>();
+                        ReceiveState newState = new ReceiveState();
+                        socket.BeginReceive(newState.Buffer, 0, dataBufferSize, SocketFlags.None, new AsyncCallback(ReceiveCallback), newState);
+                        Debug.Log($"Connected to server - MyGUID: {guid}");
+                        IsConnectedToServer = true;
+                        OnConnected?.Invoke();
                     }
                     else
                     {
+                        Debug.Log($"Has not finished receiving data, begin receiving again, Received: {state.Data.Length + byteLength}, Expected:{state.DataSize}");
                         state.Data.Write(state.Buffer, dataOffset, byteLength);
                         socket.BeginReceive(state.Buffer, 0, state.Buffer.Length, SocketFlags.None, new AsyncCallback(InitReceiveCallback), state);
                     }
@@ -376,19 +414,19 @@ namespace RealSoftGames.Network
                     {
                         state.Data.Write(state.Buffer, dataOffset, byteLength);
 
-                        using (BinaryReader reader = new BinaryReader(state.Data))
-                        {
-                            byte[] data = reader.ReadBytes(state.DataSize);
-                            Packet packet = data.Deserialize<Packet>();
+                        byte[] data = state.Data.ToArray();
+                        Packet packet = data.Deserialize<Packet>();
 
-                            if (!string.IsNullOrEmpty(packet.MethodName))
-                                MainThreadDispatcher.AddMessage(receivedData);
-                            else
-                                Debug.LogError($"Cant have a null method name in packet!");
+                        if (!string.IsNullOrEmpty(packet.MethodName))
+                            MainThreadDispatcher.AddMessage(packet);
+                        else
+                            Debug.LogError($"Cant have a null method name in packet!");
 
-                            //MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
-                            socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, new ReceiveState());
-                        }
+                        //MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
+
+                        ReceiveState newState = new ReceiveState();
+
+                        socket.BeginReceive(newState.Buffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, newState);
                     }
 
                     //byte[] data = new byte[byteLength];
@@ -418,6 +456,7 @@ namespace RealSoftGames.Network
                     {
                         byte[] serializedData = new Packet(guid, methodName, callback, parameters).Serialize();
                         SendState state = new SendState();
+                        state.socket = socket;
                         state.dataToSend = new byte[serializedData.Length + 4];
                         byte[] prefix = BitConverter.GetBytes(serializedData.Length);
                         Buffer.BlockCopy(prefix, 0, state.dataToSend, 0, prefix.Length);
@@ -441,12 +480,20 @@ namespace RealSoftGames.Network
                 if (socketError != SocketError.Success)
                 {
                     Debug.LogError($"SocketError: {socketError}");
-                    socket.Close();
+                    state.socket.Close();
                     return;
                 }
+
                 state.dataSent += sentData;
+                Debug.Log($"DataSent:{state.dataSent}, DataToSend:{state.dataToSend.Length}");
+
                 if (state.dataSent != state.dataToSend.Length)
+                {
+                    Debug.LogError($"Not all data was sent, sending the rest now: {state.dataToSend.Length - state.dataSent}");
                     socket.BeginSend(state.dataToSend, state.dataSent, state.dataToSend.Length - state.dataSent, SocketFlags.None, new AsyncCallback(SendCallback), state);
+                }
+                else
+                    Debug.Log($"All Data was sent {state.dataToSend.Length}");
             }
 
             public void Disconnect()

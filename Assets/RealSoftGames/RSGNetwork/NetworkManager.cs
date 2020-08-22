@@ -32,33 +32,9 @@ namespace RealSoftGames.Network
             {
                 case NetworkType.SERVER:
                     RSGNetwork.StartServer();
-
                     break;
 
                 case NetworkType.CLIENT:
-
-                    void OnConnected()
-                    {
-                        if (!IsConnectedToServer)
-                        {
-                            Debug.LogError("Not Connected to server");
-                            return;
-                        }
-
-                        Debug.Log("OnConnected");
-                        RSGNetwork.ServerRPC("TestRPC", "ResultRPC", 1f, 1f);
-                        RSGNetwork.OnConnected -= OnConnected;
-                    }
-
-                    void OnDisconnected()
-                    {
-                        Debug.Log("OnDisconnected");
-                        RSGNetwork.OnDisconnected -= OnDisconnected;
-                    }
-
-                    RSGNetwork.OnConnected += OnConnected;
-                    RSGNetwork.OnDisconnected += OnDisconnected;
-
                     RSGNetwork.ConnectToServer();
                     break;
             }

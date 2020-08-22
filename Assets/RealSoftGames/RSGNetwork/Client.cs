@@ -7,7 +7,6 @@ using System;
 using System.IO;
 using System.Net.Sockets;
 
-
 namespace RealSoftGames.Network
 {
     [System.Serializable]
@@ -19,8 +18,14 @@ namespace RealSoftGames.Network
             GUID = guid;
         }
 
+        /// <summary>
+        /// Called on the server when a new client connects
+        /// </summary>
         public static event Action<Client> OnClientConnected;
 
+        /// <summary>
+        /// Called on the server when a client disconnects
+        /// </summary>
         public static event Action<Client> OnClientDisconnected;
 
         public static int dataBufferSize = 4096;
@@ -43,8 +48,10 @@ namespace RealSoftGames.Network
             public static int dataBufferSize = 4096;
             public Socket socket;
             private string guid;
-            private Packet receivedData;
+
+            //private Packet receivedData;
             private byte[] receiveBuffer;
+
             private bool isConnected = false;
             public readonly Client client;
 
@@ -56,9 +63,10 @@ namespace RealSoftGames.Network
                 socket.SendBufferSize = dataBufferSize;
                 //stream = socket.GetStream();
 
-                receivedData = new Packet();
-                receiveBuffer = new byte[dataBufferSize];
-                socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, state);
+                //receivedData = new Packet();
+                //receiveBuffer = new byte[dataBufferSize];
+                state.Buffer = new byte[dataBufferSize];
+                socket.BeginReceive(state.Buffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, state);
                 isConnected = true;
 
                 OnClientConnected?.Invoke(client);
@@ -84,6 +92,7 @@ namespace RealSoftGames.Network
 
                     if (byteLength <= 0)
                     {
+                        Debug.LogError("ByteLength <= 0");
                         client.Disconnect();
                         return;
                     }
@@ -93,6 +102,7 @@ namespace RealSoftGames.Network
                         if (byteLength >= 4)
                         {
                             state.DataSize = BitConverter.ToInt32(state.Buffer, 0);
+                            Debug.Log($"Received Data: {state.DataSize}");
                             state.DataSizeReceived = true;
                             byteLength -= 4;
                             dataOffset += 4;
@@ -103,12 +113,10 @@ namespace RealSoftGames.Network
                     {
                         state.Data.Write(state.Buffer, dataOffset, byteLength);
 
-                        using (BinaryReader reader = new BinaryReader(state.Data))
-                        {
-                            byte[] data = reader.ReadBytes(state.DataSize);
-                            MainThreadDispatcher.AddMessage(data.Deserialize<Packet>());
-                            socket.BeginReceive(receiveBuffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, new ReceiveState());
-                        }
+                        Debug.Log("Process Data");
+                        MainThreadDispatcher.AddMessage(state.Data.ToArray().Deserialize<Packet>());
+                        ReceiveState newState = new ReceiveState();
+                        socket.BeginReceive(newState.Buffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, newState);
 
                         //byte[] data = new byte[byteLength];
                         //Array.Copy(receiveBuffer, data, byteLength);
@@ -119,6 +127,7 @@ namespace RealSoftGames.Network
                     }
                     else
                     {
+                        Debug.LogError("Has not yet received all the data, waiting to receive more");
                         state.Data.Write(state.Buffer, dataOffset, byteLength);
                         socket.BeginReceive(state.Buffer, 0, state.Buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), state);
                     }
@@ -139,7 +148,7 @@ namespace RealSoftGames.Network
                         //Send back to client and send servers GUID as well
                         byte[] serializedData = new Packet(methodName, callback, parameters).Serialize();
                         SendState state = new SendState();
-
+                        state.socket = socket;
                         state.dataToSend = new byte[serializedData.Length + 4];
                         byte[] prefix = BitConverter.GetBytes(serializedData.Length);
 
@@ -161,15 +170,17 @@ namespace RealSoftGames.Network
             {
                 SendState state = (SendState)result.AsyncState;
                 SocketError socketError;
-                int sentData = socket.EndSend(result, out socketError);
+                int sentData = state.socket.EndSend(result, out socketError);
 
                 if (socketError != SocketError.Success)
                 {
                     Debug.LogError($"SocketError: {socketError}");
-                    socket.Close();
+                    state.socket.Close();
                     return;
                 }
+
                 state.dataSent += sentData;
+                Debug.Log($"DataSent:{state.dataSent}, DataToSend:{state.dataToSend.Length}");
                 if (state.dataSent != state.dataToSend.Length)
                     socket.BeginSend(state.dataToSend, state.dataSent, state.dataToSend.Length - state.dataSent, SocketFlags.None, new AsyncCallback(SendCallback), state);
             }

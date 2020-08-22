@@ -5,7 +5,7 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Coffee Game Files/Scenes/GameUpdateSceneExample.unity
     guid: 5b4248be116950d46bf57c4a35a32367
   - enabled: 1
