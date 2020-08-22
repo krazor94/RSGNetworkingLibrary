@@ -376,6 +376,21 @@ PrefabInstance:
       propertyPath: ConnectOnStart
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 6315058710774182710, guid: 2d3b3f7614f318444b8b22c22fb54e31,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6315058710774182710, guid: 2d3b3f7614f318444b8b22c22fb54e31,
+        type: 3}
+      propertyPath: serverPort
+      value: 8095
+      objectReference: {fileID: 0}
+    - target: {fileID: 6315058710774182710, guid: 2d3b3f7614f318444b8b22c22fb54e31,
+        type: 3}
+      propertyPath: ipAddress
+      value: 127.0.0.1
+      objectReference: {fileID: 0}
     - target: {fileID: 6315058710774182711, guid: 2d3b3f7614f318444b8b22c22fb54e31,
         type: 3}
       propertyPath: m_Name
