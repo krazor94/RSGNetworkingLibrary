@@ -18,7 +18,7 @@ namespace RealSoftGames.Network
         [SerializeField] private bool ConnectOnStart;
         [SerializeField] private NetworkType networkType = NetworkType.SERVER;
         [SerializeField] private string ipAddress = "127.0.0.1";
-        [SerializeField] private int serverPort = 8080;
+        [SerializeField] private int serverPort = 8095;
 
         private void Start()
         {

@@ -28,7 +28,7 @@ namespace RealSoftGames.Network
         /// </summary>
         public static event Action<Client> OnClientDisconnected;
 
-        public static int dataBufferSize = 4096;
+        public static int dataBufferSize = 1024;
         public TCP tcp;
         public readonly string GUID;
 
@@ -45,7 +45,7 @@ namespace RealSoftGames.Network
                 this.client = client;
             }
 
-            public static int dataBufferSize = 4096;
+            public static int dataBufferSize = 1024;
             public Socket socket;
             private string guid;
 
@@ -92,7 +92,6 @@ namespace RealSoftGames.Network
 
                     if (byteLength <= 0)
                     {
-                        Debug.LogError("ByteLength <= 0");
                         client.Disconnect();
                         return;
                     }
@@ -102,7 +101,7 @@ namespace RealSoftGames.Network
                         if (byteLength >= 4)
                         {
                             state.DataSize = BitConverter.ToInt32(state.Buffer, 0);
-                            Debug.Log($"Received Data: {state.DataSize}");
+                            //Debug.Log($"Received Data: {state.DataSize}");
                             state.DataSizeReceived = true;
                             byteLength -= 4;
                             dataOffset += 4;
@@ -113,9 +112,14 @@ namespace RealSoftGames.Network
                     {
                         state.Data.Write(state.Buffer, dataOffset, byteLength);
 
-                        Debug.Log("Process Data");
-                        MainThreadDispatcher.AddMessage(state.Data.ToArray().Deserialize<Packet>());
+                        Packet packet = state.Data.ToArray().Deserialize<Packet>();
                         ReceiveState newState = new ReceiveState();
+
+                        if (!string.IsNullOrEmpty(packet.MethodName))
+                            MainThreadDispatcher.AddMessage(packet);
+                        else
+                            Debug.LogError($"Cant have a null method name in packet!");
+
                         socket.BeginReceive(newState.Buffer, 0, dataBufferSize, SocketFlags.None, ReceiveCallback, newState);
 
                         //byte[] data = new byte[byteLength];
@@ -127,7 +131,7 @@ namespace RealSoftGames.Network
                     }
                     else
                     {
-                        Debug.LogError("Has not yet received all the data, waiting to receive more");
+                        //Debug.LogError($"Has not yet received all the data, waiting for more to come in");
                         state.Data.Write(state.Buffer, dataOffset, byteLength);
                         socket.BeginReceive(state.Buffer, 0, state.Buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), state);
                     }
@@ -180,7 +184,7 @@ namespace RealSoftGames.Network
                 }
 
                 state.dataSent += sentData;
-                Debug.Log($"DataSent:{state.dataSent}, DataToSend:{state.dataToSend.Length}");
+                //Debug.Log($"DataSent:{state.dataSent}, DataToSend:{state.dataToSend.Length}");
                 if (state.dataSent != state.dataToSend.Length)
                     socket.BeginSend(state.dataToSend, state.dataSent, state.dataToSend.Length - state.dataSent, SocketFlags.None, new AsyncCallback(SendCallback), state);
             }
