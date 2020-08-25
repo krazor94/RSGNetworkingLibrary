@@ -34,10 +34,64 @@ NetworkView.ServerRPC("Login");
 
 
 //Send an RPC to the server with parameters
-NetworkView.ServerRPC("Login", RSGNetwork.InstanceID, inputField.text);
+NetworkView.ServerRPC("Login", inputField.text);
 
-//Send RPC to client
-RSGNetwork.GetClient(clientID).RPC("AuthenticateLogin", (int)LoginRequest.Success);
+//Send RPC to client, The Clients GUID's can be found in a lookup in RSGNetwork, these are generated when new clients connect to the server
+RSGNetwork.GetClient(GUID).RPC("AuthenticateLogin", (int)LoginRequest.Success);
+
+//Send RPC to Server with a callback with custom data types
+RSGNetwork.ServerRPCCallback("Login","LoginResultCallback","USERNAME:PASSWORD");
+
+
+LoginResult Login(string user)
+{
+    return new LoginResult(user);
+}
+
+void LoginResultCallback(LoginResult result)
+{
+    switch(result.LoginCode)
+    {
+        case LoginCode.Success:
+        //Handle a successful login
+        break;
+        
+        case LoginCode.Failed:
+        //Handle a failed Login
+        break;        
+    }
+}
+
+
+class LoginResult
+{
+    public LoginResult(user)
+    {
+        //Validate Login
+        if(validation success)
+        {
+            loginCode = LoginCode.Success;
+            int level = 1;
+            //return back all other useful User information
+        }
+        else
+        {
+            loginCode = LoginCode.Failed;
+            int level = 0;
+        }        
+    }
+    
+
+    public enum LoginCode
+    {
+        SUCCESS,
+        FAILED
+    }
+    
+    public LoginCode loginCode;
+    public int level;   
+}
+
 
 
 You need to mark methods with RPC Attribute, Their will be conflicting namespaces with unity, so add this to the top of your script
@@ -48,7 +102,7 @@ otherwise you will need to put this as the RPC itself
 
 
 [RPC]
-public void Login(int clientID, string user = "")
+public void Login(string GUID, string user = "")
 {
     Debug.Log($"Client:{clientID} called Login for user {user}");
     if (RSGNetwork.IsServer)
@@ -73,7 +127,7 @@ Support for cross scene network communication, yes you can have multiple clients
 //IObservable is not yet ready and will be available in a future update as its next on ym list to complete
 Sync Variables reliably by implementing IObservable interface and assigning it to the NetworkView
 
- public class LoginForm : MonoBehaviour, IObservable
+public class Sync : MonoBehaviour, IObservable
 {
     private float xAxis;
     private float yAxis;
@@ -92,3 +146,7 @@ Sync Variables reliably by implementing IObservable interface and assigning it t
         }
     }
  }
+
+
+
+Join us on Discord: https://discord.gg/AUrh5Xd
