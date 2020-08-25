@@ -9,7 +9,7 @@ UDP & RUDP will be added in the future.
 
 
 Start a Server/Client
-
+```
 private void Start()
 {
     RSGNetwork.ServerIPAddress = serverIp;
@@ -26,20 +26,24 @@ private void Start()
             break;
     }
 }
-
+```
 
 
 //Send an RPC to the server, with no parameters
+```
 NetworkView.ServerRPC("Login");
-
+```
 
 //Send an RPC to the server with parameters
+```
 NetworkView.ServerRPC("Login", inputField.text);
-
+```
 //Send RPC to client, The Clients GUID's can be found in a lookup in RSGNetwork, these are generated when new clients connect to the server
+```
 RSGNetwork.GetClient(GUID).RPC("AuthenticateLogin", (int)LoginRequest.Success);
-
+```
 //Send RPC to Server with a callback with custom data types
+```
 RSGNetwork.ServerRPCCallback("Login","LoginResultCallback","USERNAME:PASSWORD");
 
 
@@ -91,16 +95,17 @@ class LoginResult
     public LoginCode loginCode;
     public int level;   
 }
-
+```
 
 
 You need to mark methods with RPC Attribute, Their will be conflicting namespaces with unity, so add this to the top of your script
 using RPC = RealSoftGames.Network.RPC;
 
 otherwise you will need to put this as the RPC itself
+```
 [RealSoftGames.Network.RPC]
-
-
+```
+```
 [RPC]
 public void Login(string GUID, string user = "")
 {
@@ -113,7 +118,7 @@ public void Login(string GUID, string user = "")
             RSGNetwork.GetClient(clientID).RPC("AuthenticateLogin", (int)LoginRequest.Failed);
     }
 }
-
+```
 
 RPC Supports both Static and Instanced types
 
@@ -126,7 +131,7 @@ Support for cross scene network communication, yes you can have multiple clients
 
 //IObservable is not yet ready and will be available in a future update as its next on ym list to complete
 Sync Variables reliably by implementing IObservable interface and assigning it to the NetworkView
-
+```
 public class Sync : MonoBehaviour, IObservable
 {
     private float xAxis;
@@ -146,7 +151,7 @@ public class Sync : MonoBehaviour, IObservable
         }
     }
  }
-
+```
 
 
 Join us on Discord: https://discord.gg/AUrh5Xd
