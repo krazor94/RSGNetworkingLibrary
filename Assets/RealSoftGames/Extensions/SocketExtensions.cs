@@ -3,10 +3,14 @@
 //Company: RealSoft Games
 //Website: https://www.realsoftgames.com/
 
-using System.Collections;
-using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using UnityEngine;
+using System.Threading;
+using System.Threading.Tasks;
+using Ping = System.Net.NetworkInformation.Ping;
 
 namespace RealSoftGames.Network
 {
@@ -18,7 +22,11 @@ namespace RealSoftGames.Network
             {
                 return !(socket.Poll(1, SelectMode.SelectRead) && socket.Available == 0);
             }
-            catch (SocketException) { return false; }
+            catch
+            (SocketException)
+            {
+                return false;
+            }
         }
     }
 }

@@ -41,6 +41,11 @@ namespace RealSoftGames.Network
         public static bool IsServer { get; private set; }
         public static bool IsInitialized { get; private set; }
 
+        /// <summary>
+        /// Poll the server to check for connection
+        /// </summary>
+        public static bool IsConencted { get => tcp.socket.IsConnected(); }
+
         public static Type[] GetAssemblies()
         {
             var result = new List<System.Type>();
@@ -169,7 +174,7 @@ namespace RealSoftGames.Network
             if (socketError != SocketError.Success)
             {
                 Debug.LogError($"SocketError: {socketError}");
-                state.socket.Close();
+                tcp.Disconnect();
                 return;
             }
 
@@ -224,7 +229,6 @@ namespace RealSoftGames.Network
         public static void DisconnectFromServer()
         {
             tcp.Disconnect();
-            tcp.socket.Close();
         }
 
         /// <summary>
@@ -388,7 +392,7 @@ namespace RealSoftGames.Network
 
                     //int byteLength = socket.EndReceive(result);
 
-                    if (socketError != SocketError.Success)
+                    if (socketError != SocketError.Success || !socket.IsConnected())
                     {
                         Debug.LogError($"Socket Error:{socketError}");
                         Disconnect();
@@ -458,7 +462,7 @@ namespace RealSoftGames.Network
             {
                 try
                 {
-                    if (socket != null)
+                    if (socket != null && socket.IsConnected())
                     {
                         byte[] serializedData = new Packet(guid, methodName, callback, parameters).Serialize();
                         SendState state = new SendState();
@@ -470,6 +474,8 @@ namespace RealSoftGames.Network
                         socket.BeginSend(state.dataToSend, 0, state.dataToSend.Length, SocketFlags.None, new AsyncCallback(SendCallback), state);
                         //socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }
+                    else
+                        Debug.LogError("Socket is null! || Disconnected");
                 }
                 catch (Exception e)
                 {
@@ -483,10 +489,10 @@ namespace RealSoftGames.Network
                 SocketError socketError;
                 int sentData = socket.EndSend(result, out socketError);
 
-                if (socketError != SocketError.Success)
+                if (socketError != SocketError.Success || !socket.IsConnected())
                 {
                     Debug.LogError($"SocketError: {socketError}");
-                    state.socket.Close();
+                    Disconnect();
                     return;
                 }
 
@@ -504,9 +510,14 @@ namespace RealSoftGames.Network
 
             public void Disconnect()
             {
-                socket.Disconnect(false);
-                OnDisconnected?.Invoke();
-                IsConnectedToServer = false;
+                if (IsConnectedToServer)
+                {
+                    IsConnectedToServer = false;
+                    Debug.LogError("Disconnecting from server");
+                    socket.Disconnect(false);
+                    socket.Close();
+                    OnDisconnected?.Invoke();
+                }
             }
         }
     }

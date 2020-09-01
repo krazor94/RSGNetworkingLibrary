@@ -13,6 +13,7 @@ namespace RealSoftGames
     public class MainThreadDispatcher : MonoBehaviour
     {
         public static List<Packet> packets = new List<Packet>();
+        private readonly static Queue<Action> ExecuteOnMainThread = new Queue<Action>();
 
         private void Update()
         {
@@ -25,6 +26,11 @@ namespace RealSoftGames
                 }
 
                 packets.Clear();
+            }
+
+            while (ExecuteOnMainThread.Count > 0)
+            {
+                ExecuteOnMainThread.Dequeue().Invoke();
             }
         }
 
@@ -49,6 +55,11 @@ namespace RealSoftGames
             }
             else
                 Debug.LogError("Cant add a null message!");
+        }
+
+        public static void ExecuteOnmainThread(Action action)
+        {
+            ExecuteOnMainThread.Enqueue(() => action?.Invoke());
         }
     }
 }

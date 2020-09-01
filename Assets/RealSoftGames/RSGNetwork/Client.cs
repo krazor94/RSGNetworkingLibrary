@@ -49,9 +49,6 @@ namespace RealSoftGames.Network
             public Socket socket;
             private string guid;
 
-            //private Packet receivedData;
-            private byte[] receiveBuffer;
-
             private bool isConnected = false;
             public readonly Client client;
 
@@ -83,16 +80,16 @@ namespace RealSoftGames.Network
                     int byteLength = socket.EndReceive(result, out socketError);
                     int dataOffset = 0;
 
-                    if (socketError != SocketError.Success)
+                    if (socketError != SocketError.Success || !socket.IsConnected())
                     {
                         Debug.LogError($"Socket Error:{socketError}");
-                        client.Disconnect();
+                        Disconnect();
                         return;
                     }
 
                     if (byteLength <= 0)
                     {
-                        client.Disconnect();
+                        Disconnect();
                         return;
                     }
 
@@ -147,7 +144,7 @@ namespace RealSoftGames.Network
             {
                 try
                 {
-                    if (socket != null)
+                    if (socket != null && socket.IsConnected())
                     {
                         //Send back to client and send servers GUID as well
                         byte[] serializedData = new Packet(methodName, callback, parameters).Serialize();
@@ -163,6 +160,8 @@ namespace RealSoftGames.Network
                         //stream.BeginWrite(serializedData, 0, serializedData.Length, null, null);
                         //socket.BeginSend(serializedData, 0, serializedData.Length, SocketFlags.None, null, null);
                     }
+                    else
+                        Debug.LogError("Not Connected to server");
                 }
                 catch (Exception e)
                 {
@@ -176,10 +175,10 @@ namespace RealSoftGames.Network
                 SocketError socketError;
                 int sentData = state.socket.EndSend(result, out socketError);
 
-                if (socketError != SocketError.Success)
+                if (socketError != SocketError.Success || !socket.IsConnected())
                 {
                     Debug.LogError($"SocketError: {socketError}");
-                    state.socket.Close();
+                    Disconnect();
                     return;
                 }
 
@@ -191,13 +190,14 @@ namespace RealSoftGames.Network
 
             public void Disconnect()
             {
-                //if (isConnected)
-                //{
-                Debug.Log($"Client Disconnected {socket.RemoteEndPoint}");
-                OnClientDisconnected?.Invoke(client);
-                isConnected = false;
-                socket.Disconnect(false);
-                //}
+                if (isConnected)
+                {
+                    isConnected = false;
+                    Debug.Log($"Client Disconnected {socket.RemoteEndPoint}");
+                    OnClientDisconnected?.Invoke(client);
+                    client.tcp.socket.Disconnect(false);
+                    client.tcp.socket.Close();
+                }
             }
         }
     }
