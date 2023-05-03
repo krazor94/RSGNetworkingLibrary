@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace RealSoftGames
+namespace RealSoftGames.Network
 {
     public interface IObservable
     {

@@ -15,27 +15,30 @@ namespace RealSoftGames.Network
         {
         }
 
-        public Packet(string methodName, string callback = null, params object[] parameters)
+        public Packet(string remoteEndpoint, string methodName, string callback = null, params object[] parameters)
         {
+            this.remoteEndPoint = remoteEndpoint;
             this.methodName = methodName;
             this.parameters = parameters;
             this.callback = callback;
         }
 
-        public Packet(string sender, string methodName, string callback = null, params object[] parameters)
-        {
-            this.methodName = methodName;
-            this.parameters = parameters;
-            this.callback = callback;
-            this.sender = sender;
-        }
+        //public Packet(string sender, string methodName, string callback = null, params object[] parameters)
+        //{
+        //    this.methodName = methodName;
+        //    this.parameters = parameters;
+        //    this.callback = callback;
+        //    this.sender = sender;
+        //}
 
         //private byte packetType;
+        //private string sender;
 
-        private string sender;
+        private string remoteEndPoint;
         private string callback;
         private string methodName;
         private object[] parameters;
+        public string RemoteEndPoint { get => remoteEndPoint; }
         public string MethodName { get => methodName; }
         public object[] Parameters { get => parameters; }
         public string Callback { get => callback; }
@@ -60,10 +63,14 @@ namespace RealSoftGames.Network
                         var result = value.Invoke(null, parameters);
                         if (RSGNetwork.IsServer)
                         {
-                            if (result != null)
-                                RSGNetwork.RPC(sender, callback, null, result);
-                            else
-                                RSGNetwork.RPC(sender, callback);
+                            if (RSGNetwork.Clients.TryGetValue(RemoteEndPoint, out Client client))
+                            {
+                                if (result != null)
+                                    RSGNetwork.RPC(client, callback, null, result);
+                                else
+                                    RSGNetwork.RPC(client, callback);
+                            }
+                            else Debug.LogError($"Endpoint not found! {RemoteEndPoint}");
                         }
                         else
                         {
@@ -86,10 +93,15 @@ namespace RealSoftGames.Network
                                     var result = value.Invoke(behaviour, parameters);
                                     if (RSGNetwork.IsServer)
                                     {
-                                        if (result != null)
-                                            RSGNetwork.RPC(sender, callback, null, result);
+                                        if (RSGNetwork.Clients.TryGetValue(RemoteEndPoint, out Client client))
+                                        {
+                                            if (result != null)
+                                                RSGNetwork.RPC(client, callback, null, result);
+                                            else
+                                                RSGNetwork.RPC(client, callback, null);
+                                        }
                                         else
-                                            RSGNetwork.RPC(sender, callback, null);
+                                            Debug.LogError($"Endpoint not found {RemoteEndPoint}");
                                     }
                                     else
                                     {
